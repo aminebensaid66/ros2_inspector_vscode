@@ -1,0 +1,9 @@
+.github/**
+.vscode/**
+test/**
+fixtures/**
+docs/**
+demo/**
+scripts/**
+*.vsix
+.DS_Store

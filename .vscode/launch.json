@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run ROS2 Inspector Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}", "${workspaceFolder}/fixtures/demo_ws"],
+      "outFiles": []
+    }
+  ]
+}

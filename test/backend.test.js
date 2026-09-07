@@ -1,0 +1,10 @@
+'use strict';
+const test=require('node:test');const assert=require('node:assert/strict');const {InspectorBackend,parseVersion,versionAtLeast}=require('../src/backend');
+test('parses CLI version',()=>assert.deepEqual(parseVersion('ros2inspector v0.1.3'),{major:0,minor:1,patch:3,raw:'0.1.3'}));
+test('rejects invalid version text',()=>assert.equal(parseVersion('hello'),null));
+test('compares patch versions',()=>{assert.equal(versionAtLeast('0.1.3','0.1.3'),true);assert.equal(versionAtLeast('0.1.2','0.1.3'),false)});
+test('compares minor versions',()=>assert.equal(versionAtLeast('0.2.0','0.1.99'),true));
+test('inspect uses quiet full JSON graph without shell',async()=>{let call;const runner=async(c,a,o)=>{call={c,a,o};return{code:0,stdout:'{"graph":{"nodes":[],"edges":[]}}',stderr:''}};const b=new InspectorBackend({runner});await b.inspect('/tmp/ws');assert.deepEqual(call.a.slice(0,5),['--quiet','graph','full','--format','json']);assert.equal(call.a.at(-2),'-C')});
+test('checkVersion enforces minimum',async()=>{const b=new InspectorBackend({minimumVersion:'0.1.3',runner:async()=>({code:0,stdout:'ros2inspector v0.1.2',stderr:''})});await assert.rejects(()=>b.checkVersion(),/0.1.3\+ is required/)});
+test('validation accepts exit 1 as policy violations',async()=>{const b=new InspectorBackend({runner:async()=>({code:1,stdout:'{"summary":{},"violations":[{"severity":"error"}]}',stderr:''})});const r=await b.validate('/tmp/ws','/tmp/policy.yaml');assert.equal(r.exitCode,1);assert.equal(r.violations.length,1)});
+test('validation rejects invocation failure',async()=>{const b=new InspectorBackend({runner:async()=>({code:3,stdout:'',stderr:'not found'})});await assert.rejects(()=>b.validate('/tmp/ws','x'),/validation failed/)});

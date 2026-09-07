@@ -1,0 +1,106 @@
+{
+  "name": "ros2-inspector-vscode",
+  "displayName": "ROS2 Inspector",
+  "description": "Static ROS 2 architecture exploration, diagnostics and policy checks inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "aminebensaid66",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Programming Languages", "Visualization", "Linters"],
+  "keywords": ["ros2", "ros", "robotics", "architecture", "static-analysis", "graph"],
+  "repository": { "type": "git", "url": "https://github.com/aminebensaid66/ros2_inspector_vscode.git" },
+  "homepage": "https://github.com/aminebensaid66/ros2_inspector_vscode#readme",
+  "bugs": { "url": "https://github.com/aminebensaid66/ros2_inspector_vscode/issues" },
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onView:ros2Inspector.explorer",
+    "onCommand:ros2Inspector.refresh",
+    "onCommand:ros2Inspector.openGraph",
+    "onCommand:ros2Inspector.validate",
+    "onCommand:ros2Inspector.selectWorkspace",
+    "onCommand:ros2Inspector.openSource",
+    "workspaceContains:**/package.xml"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ros2Inspector",
+          "title": "ROS2 Inspector",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "ros2Inspector": [
+        {
+          "id": "ros2Inspector.explorer",
+          "name": "Architecture Explorer"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "ros2Inspector.refresh", "title": "ROS2 Inspector: Refresh Workspace", "icon": "$(refresh)" },
+      { "command": "ros2Inspector.openGraph", "title": "ROS2 Inspector: Open Architecture Graph", "icon": "$(type-hierarchy)" },
+      { "command": "ros2Inspector.validate", "title": "ROS2 Inspector: Validate Policy", "icon": "$(pass-filled)" },
+      { "command": "ros2Inspector.selectWorkspace", "title": "ROS2 Inspector: Select Workspace Folder" },
+      { "command": "ros2Inspector.openSource", "title": "ROS2 Inspector: Open Source" },
+      { "command": "ros2Inspector.copySummary", "title": "ROS2 Inspector: Copy Architecture Summary" },
+      { "command": "ros2Inspector.showOutput", "title": "ROS2 Inspector: Show Output" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "ros2Inspector.refresh", "when": "view == ros2Inspector.explorer", "group": "navigation@1" },
+        { "command": "ros2Inspector.openGraph", "when": "view == ros2Inspector.explorer", "group": "navigation@2" },
+        { "command": "ros2Inspector.validate", "when": "view == ros2Inspector.explorer", "group": "navigation@3" }
+      ],
+      "view/item/context": [
+        { "command": "ros2Inspector.openSource", "when": "view == ros2Inspector.explorer && viewItem == ros2Inspector.source", "group": "inline" }
+      ]
+    },
+    "configuration": {
+      "title": "ROS2 Inspector",
+      "properties": {
+        "ros2Inspector.executablePath": {
+          "type": "string",
+          "default": "ros2inspector",
+          "description": "Path or command name for the ROS2 Inspector CLI."
+        },
+        "ros2Inspector.workspacePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional ROS 2 workspace root. Empty uses the selected VS Code workspace folder."
+        },
+        "ros2Inspector.minimumVersion": {
+          "type": "string",
+          "default": "0.1.3",
+          "description": "Minimum supported ROS2 Inspector CLI version."
+        },
+        "ros2Inspector.refreshOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refresh architecture after saving Python, C++, ROS interface, launch or package metadata files."
+        },
+        "ros2Inspector.policyFile": {
+          "type": "string",
+          "default": "ros2inspector_policy.yaml",
+          "description": "Policy file relative to the selected workspace, or an absolute path."
+        },
+        "ros2Inspector.graph.maxNodes": {
+          "type": "number",
+          "default": 350,
+          "minimum": 25,
+          "maximum": 2000,
+          "description": "Maximum graph nodes rendered at once to keep the webview responsive."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "verify": "node scripts/verify.js",
+    "package": "node scripts/package-vsix.js",
+    "clean": "node scripts/clean.js"
+  }
+}
