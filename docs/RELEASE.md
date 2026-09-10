@@ -1,9 +1,11 @@
 # Release
 
-1. Update `version` in `package.json` and `CHANGELOG.md`.
-2. Run `npm run verify` and `npm run package` on at least one local platform.
-3. Install the generated VSIX manually in stable VS Code and test a real workspace.
-4. Push and require the GitHub CI matrix to be green on Linux, macOS and Windows.
-5. Tag `v<version>`; `release.yml` packages and attaches the VSIX to the GitHub Release.
-6. For Marketplace publication, ensure `package.json.publisher` exactly matches the Marketplace publisher ID. The generated VSIX is compatible with normal Marketplace tooling, or it can be repackaged/published with `@vscode/vsce` if preferred.
-7. Verify installation from the released artifact before public announcement.
+1. Confirm `package.json` and `CHANGELOG.md` version.
+2. Run `npm run verify`.
+3. Install `ros2inspector==0.1.3` and run `npm run test:contract`.
+4. Run `npm run package` and `npm run validate:vsix`.
+5. Install the generated VSIX into a clean VS Code profile and complete `demo/LAUNCH_CHECKLIST.md`.
+6. Require the Linux/macOS/Windows CI matrix and real analyzer contract to pass.
+7. Verify the Marketplace publisher ID exactly matches `package.json#publisher` before publication.
+
+Generated `.vsix` files are local/release artifacts and must not be committed.

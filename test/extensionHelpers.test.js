@@ -1,0 +1,6 @@
+'use strict';
+const Module=require('node:module');const original=Module._load;const mock={workspace:{getConfiguration:()=>({get:(_k,d)=>d})}};Module._load=function(request,parent,isMain){if(request==='vscode')return mock;return original.call(this,request,parent,isMain)};
+const test=require('node:test');const assert=require('node:assert/strict');const {starterPolicy,suggestedRosCommand,clampNumber}=require('../src/extension');
+test('starter policy uses only known 0.1.3 rule types',()=>{const text=starterPolicy();for(const type of ['maintainer_required','version_not_default','no_circular_deps','node_isolation','topic_connectivity'])assert.match(text,new RegExp('type: '+type));assert.doesNotMatch(text,/runtime|live graph/i)});
+test('suggested ROS commands are returned only as strings',()=>{assert.equal(suggestedRosCommand({kind:'Topic',name:'/x',data:{name:'/x'}}),'ros2 topic info /x');assert.equal(suggestedRosCommand({kind:'Interface',name:'pkg/T',data:{package:'pkg',name:'T'}}),'ros2 interface show pkg/T')});
+test('numeric config values clamp defensively',()=>{assert.equal(clampNumber('bad',20,1,200),20);assert.equal(clampNumber(-2,20,1,200),1);assert.equal(clampNumber(500,20,1,200),200)});

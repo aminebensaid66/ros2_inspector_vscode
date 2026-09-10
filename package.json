@@ -2,24 +2,47 @@
   "name": "ros2-inspector-vscode",
   "displayName": "ROS2 Inspector",
   "description": "Static ROS 2 architecture exploration, diagnostics and policy checks inside VS Code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "aminebensaid66",
   "license": "MIT",
   "icon": "media/icon.png",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Programming Languages", "Visualization", "Linters"],
-  "keywords": ["ros2", "ros", "robotics", "architecture", "static-analysis", "graph"],
-  "repository": { "type": "git", "url": "https://github.com/aminebensaid66/ros2_inspector_vscode.git" },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization",
+    "Linters"
+  ],
+  "keywords": [
+    "ros2",
+    "ros",
+    "robotics",
+    "architecture",
+    "static-analysis",
+    "graph"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aminebensaid66/ros2_inspector_vscode.git"
+  },
   "homepage": "https://github.com/aminebensaid66/ros2_inspector_vscode#readme",
-  "bugs": { "url": "https://github.com/aminebensaid66/ros2_inspector_vscode/issues" },
+  "bugs": {
+    "url": "https://github.com/aminebensaid66/ros2_inspector_vscode/issues"
+  },
   "main": "./src/extension.js",
   "activationEvents": [
-    "onView:ros2Inspector.explorer",
     "onCommand:ros2Inspector.refresh",
     "onCommand:ros2Inspector.openGraph",
     "onCommand:ros2Inspector.validate",
+    "onCommand:ros2Inspector.runAudit",
+    "onCommand:ros2Inspector.showFindings",
+    "onCommand:ros2Inspector.createStarterPolicy",
     "onCommand:ros2Inspector.selectWorkspace",
     "onCommand:ros2Inspector.openSource",
+    "onCommand:ros2Inspector.showDetails",
+    "onCommand:ros2Inspector.revealInGraph",
+    "onView:ros2Inspector.explorer",
     "workspaceContains:**/package.xml"
   ],
   "contributes": {
@@ -41,22 +64,152 @@
       ]
     },
     "commands": [
-      { "command": "ros2Inspector.refresh", "title": "ROS2 Inspector: Refresh Workspace", "icon": "$(refresh)" },
-      { "command": "ros2Inspector.openGraph", "title": "ROS2 Inspector: Open Architecture Graph", "icon": "$(type-hierarchy)" },
-      { "command": "ros2Inspector.validate", "title": "ROS2 Inspector: Validate Policy", "icon": "$(pass-filled)" },
-      { "command": "ros2Inspector.selectWorkspace", "title": "ROS2 Inspector: Select Workspace Folder" },
-      { "command": "ros2Inspector.openSource", "title": "ROS2 Inspector: Open Source" },
-      { "command": "ros2Inspector.copySummary", "title": "ROS2 Inspector: Copy Architecture Summary" },
-      { "command": "ros2Inspector.showOutput", "title": "ROS2 Inspector: Show Output" }
+      {
+        "command": "ros2Inspector.refresh",
+        "title": "ROS2 Inspector: Refresh Workspace",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ros2Inspector.runAudit",
+        "title": "ROS2 Inspector: Run Architecture Audit",
+        "icon": "$(search)"
+      },
+      {
+        "command": "ros2Inspector.validate",
+        "title": "ROS2 Inspector: Validate Policy",
+        "icon": "$(pass-filled)"
+      },
+      {
+        "command": "ros2Inspector.showFindings",
+        "title": "ROS2 Inspector: Show Findings",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "ros2Inspector.createStarterPolicy",
+        "title": "ROS2 Inspector: Create Starter Policy",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "ros2Inspector.openGraph",
+        "title": "ROS2 Inspector: Open Architecture Graph",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "ros2Inspector.selectWorkspace",
+        "title": "ROS2 Inspector: Select Workspace Folder"
+      },
+      {
+        "command": "ros2Inspector.openSource",
+        "title": "ROS2 Inspector: Open Source",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "ros2Inspector.showDetails",
+        "title": "ROS2 Inspector: Show Details",
+        "icon": "$(info)"
+      },
+      {
+        "command": "ros2Inspector.revealInGraph",
+        "title": "ROS2 Inspector: Reveal in Architecture Graph",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "ros2Inspector.copyRosName",
+        "title": "ROS2 Inspector: Copy ROS Name"
+      },
+      {
+        "command": "ros2Inspector.copyInterfaceType",
+        "title": "ROS2 Inspector: Copy Interface Type"
+      },
+      {
+        "command": "ros2Inspector.copySourcePath",
+        "title": "ROS2 Inspector: Copy Source Path"
+      },
+      {
+        "command": "ros2Inspector.copyRosCommand",
+        "title": "ROS2 Inspector: Copy Suggested ROS CLI Command"
+      },
+      {
+        "command": "ros2Inspector.focusRelated",
+        "title": "ROS2 Inspector: Focus Related Entities"
+      },
+      {
+        "command": "ros2Inspector.copySummary",
+        "title": "ROS2 Inspector: Copy Architecture Summary"
+      },
+      {
+        "command": "ros2Inspector.showOutput",
+        "title": "ROS2 Inspector: Show Output"
+      },
+      {
+        "command": "ros2Inspector.showFinding",
+        "title": "ROS2 Inspector: Show Finding"
+      }
     ],
     "menus": {
       "view/title": [
-        { "command": "ros2Inspector.refresh", "when": "view == ros2Inspector.explorer", "group": "navigation@1" },
-        { "command": "ros2Inspector.openGraph", "when": "view == ros2Inspector.explorer", "group": "navigation@2" },
-        { "command": "ros2Inspector.validate", "when": "view == ros2Inspector.explorer", "group": "navigation@3" }
+        {
+          "command": "ros2Inspector.refresh",
+          "when": "view == ros2Inspector.explorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ros2Inspector.openGraph",
+          "when": "view == ros2Inspector.explorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ros2Inspector.runAudit",
+          "when": "view == ros2Inspector.explorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ros2Inspector.validate",
+          "when": "view == ros2Inspector.explorer",
+          "group": "navigation@4"
+        }
       ],
       "view/item/context": [
-        { "command": "ros2Inspector.openSource", "when": "view == ros2Inspector.explorer && viewItem == ros2Inspector.source", "group": "inline" }
+        {
+          "command": "ros2Inspector.openSource",
+          "when": "view == ros2Inspector.explorer && viewItem == ros2Inspector.entity.source",
+          "group": "inline@1"
+        },
+        {
+          "command": "ros2Inspector.showDetails",
+          "when": "view == ros2Inspector.explorer && (viewItem == ros2Inspector.entity || viewItem == ros2Inspector.entity.source)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ros2Inspector.revealInGraph",
+          "when": "view == ros2Inspector.explorer && (viewItem == ros2Inspector.entity || viewItem == ros2Inspector.entity.source)",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ros2Inspector.focusRelated",
+          "when": "view == ros2Inspector.explorer && (viewItem == ros2Inspector.entity || viewItem == ros2Inspector.entity.source)",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ros2Inspector.copyRosName",
+          "when": "view == ros2Inspector.explorer && (viewItem == ros2Inspector.entity || viewItem == ros2Inspector.entity.source)",
+          "group": "copy@1"
+        },
+        {
+          "command": "ros2Inspector.copyInterfaceType",
+          "when": "view == ros2Inspector.explorer && (viewItem == ros2Inspector.entity || viewItem == ros2Inspector.entity.source)",
+          "group": "copy@2"
+        },
+        {
+          "command": "ros2Inspector.copySourcePath",
+          "when": "view == ros2Inspector.explorer && viewItem == ros2Inspector.entity.source",
+          "group": "copy@3"
+        },
+        {
+          "command": "ros2Inspector.copyRosCommand",
+          "when": "view == ros2Inspector.explorer && (viewItem == ros2Inspector.entity || viewItem == ros2Inspector.entity.source)",
+          "group": "copy@4"
+        }
       ]
     },
     "configuration": {
@@ -93,6 +246,20 @@
           "minimum": 25,
           "maximum": 2000,
           "description": "Maximum graph nodes rendered at once to keep the webview responsive."
+        },
+        "ros2Inspector.analyzer.timeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 1000,
+          "maximum": 600000,
+          "description": "Maximum time in milliseconds for one ROS2 Inspector analyzer process."
+        },
+        "ros2Inspector.analyzer.maxOutputMB": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Maximum stdout/stderr captured from one analyzer process before it is terminated."
         }
       }
     }
@@ -101,6 +268,8 @@
     "test": "node --test test/*.test.js",
     "verify": "node scripts/verify.js",
     "package": "node scripts/package-vsix.js",
-    "clean": "node scripts/clean.js"
+    "clean": "node scripts/clean.js",
+    "test:contract": "node scripts/test-real-contract.js",
+    "validate:vsix": "node scripts/validate-vsix.js"
   }
 }

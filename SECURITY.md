@@ -1,18 +1,20 @@
 # Security
 
-## Supported versions
+## Security boundary
 
-Security fixes are applied to the latest released extension version.
+ROS2 Inspector for VS Code is static-only. It never requires or connects to a running ROS graph, DDS/RMW, rosbridge, ROS daemon, or live topic data. It does not launch/build/source the workspace or execute workspace code.
 
-## Security model
+- No telemetry and no runtime network requests.
+- No source code or workspace metadata is uploaded.
+- Analyzer execution is blocked until VS Code Workspace Trust is granted.
+- Analyzer subprocesses use Node `spawn` with `shell: false`.
+- Analyzer duration and captured stdout/stderr are bounded; active work can be cancelled/superseded.
+- The installed analyzer must satisfy the configured minimum version (0.1.3 baseline).
+- Graph and details webviews use restrictive CSPs, per-render nonces, no remote resources, and no workspace local-resource roots.
+- Analyzer-controlled values are displayed through DOM `textContent` or script-context-safe JSON embedding.
 
-- No telemetry or runtime network requests.
-- The analyzer is executed with Node `spawn(..., { shell: false })`.
-- Analysis is blocked in untrusted VS Code workspaces.
-- The architecture webview uses a restrictive Content Security Policy and a per-render nonce.
-- Analyzer/source metadata is rendered through DOM `textContent`; JSON embedded in the webview is escaped for HTML script contexts.
-- The webview is not granted access to local workspace files.
+Suggested `ros2 ...` commands are text-only clipboard suggestions. The extension never executes them.
 
 ## Reporting
 
-Please report vulnerabilities privately to the maintainer rather than opening a public exploit report. Include extension version, VS Code version, operating system, reproduction steps, and impact.
+Report security vulnerabilities privately to the maintainer. Include extension version, VS Code version, platform/remote environment, reproduction steps, and impact.

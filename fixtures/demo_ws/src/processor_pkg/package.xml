@@ -1,0 +1,1 @@
+<package format="3"><name>processor_pkg</name><version>0.3.0</version><description>Static demo processing package.</description><maintainer email="robot@example.com">Robot Team</maintainer><license>Apache-2.0</license><exec_depend>camera_pkg</exec_depend><exec_depend>interfaces_pkg</exec_depend><exec_depend>rclpy</exec_depend></package>

@@ -1,0 +1,6 @@
+version: 1
+rules:
+  - type: naming
+    nodes:
+      pattern: '^never_matches$'
+      severity: error

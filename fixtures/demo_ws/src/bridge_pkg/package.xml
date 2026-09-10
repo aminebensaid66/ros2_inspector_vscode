@@ -1,0 +1,1 @@
+<package format="3"><name>bridge_pkg</name><version>0.4.0</version><description>Static demo bridge package.</description><maintainer email="robot@example.com">Robot Team</maintainer><license>MIT</license><exec_depend>interfaces_pkg</exec_depend><exec_depend>rclpy</exec_depend></package>

@@ -1,33 +1,38 @@
 # ROS2 Inspector for VS Code
 
-Bring the **ROS2 Inspector** static ROS 2 architecture model directly into Visual Studio Code: packages, source nodes, launch deployments, topics, services, actions, interfaces, diagnostics, policy checks, and an interactive architecture graph.
+Turn the released **ROS2 Inspector** static model into an architecture investigation workspace inside Visual Studio Code.
 
 ![ROS2 Inspector VS Code preview](media/product-preview.png)
 
-## Highlights
+## What 0.2.0 adds
 
-- Native Activity Bar **Architecture Explorer**
-- First-class source-node and launch-deployment representation
-- Communications, dependencies, and full-architecture graph modes
-- Searchable, CSP-restricted, dependency-free graph webview
-- VS Code **Problems** integration for source-located analyzer findings
-- Policy validation from `ros2inspector_policy.yaml`
-- One-click navigation back to source
-- Workspace Trust aware: no analyzer process runs in an untrusted workspace
-- No telemetry and no runtime network requests
-- Runs the CLI with `shell: false` to avoid shell interpolation
-- Supports local VS Code on Linux/macOS/Windows and remote extension hosts such as WSL/SSH/Dev Containers when `ros2inspector` is installed in the extension-host environment
+- Relationship-aware, expandable explorer instead of flat inventories.
+- Source nodes aggregate their launch deployments, publishers/subscribers, services, actions, interfaces, and findings.
+- Topics show publishers/subscribers; services show providers/clients; actions show servers/clients; deployments link back to their source nodes.
+- Packages expose metadata/health, dependencies, source nodes, deployments, interfaces, and analyzer findings.
+- First-class **Audit Findings** and **Policy Violations**, grouped by severity and rule type.
+- Entity Details panel with static metadata, source evidence, incoming/outgoing graph relationships, related entities, findings, source/reveal/copy actions.
+- VS Code Problems integration for source-located static diagnostics/audit/policy results.
+- Architecture graph with real zoom, wheel/trackpad zoom, drag pan, fit/reset, arrowheads, edge labels, search, kind/package/namespace/relationship filters, isolated-entity control, selection details, and 1/2-hop focus.
+- Reliable cancellable refresh generations so older analyzer results cannot overwrite newer ones; failed refreshes are visibly stale.
+- Analyzer timeout and output-size bounds.
+
+## Static-only by design
+
+This extension **does not inspect a running ROS graph**. It does not call `ros2 node`, `ros2 topic`, `ros2 service`, or `ros2 action`; connect to DDS/RMW/rosbridge; invoke launch files; source or build a workspace; monitor messages; or execute workspace code.
+
+A ROS 2 installation is **not required**. The extension only runs the static `ros2inspector` CLI. Suggested ROS CLI commands can be copied as plain text; they are never executed by the extension.
 
 ## Requirements
 
-Install ROS2 Inspector **0.1.3 or later** in the environment where VS Code's extension host runs:
+Install ROS2 Inspector **0.1.3 or later** in the environment where the VS Code extension host runs:
 
 ```bash
 python -m pip install -U "ros2inspector>=0.1.3"
 ros2inspector --version
 ```
 
-For a local desktop workspace this is normally your local Python environment. For Remote SSH, WSL, Dev Containers, or Codespaces, install it in that remote environment.
+For Remote SSH, WSL, Dev Containers, or Codespaces, install it in that remote extension-host environment.
 
 ## Install from source
 
@@ -38,75 +43,49 @@ npm run verify
 npm run package
 ```
 
-Then install the generated `ros2-inspector-vscode-0.1.0.vsix` with **Extensions → … → Install from VSIX…**.
+Install `ros2-inspector-vscode-0.2.0.vsix` with **Extensions → … → Install from VSIX…**.
 
-No `npm install` is required: the extension intentionally has zero runtime and development npm dependencies.
+No `npm install` is required: the extension has zero npm runtime dependencies and uses Node/VS Code built-ins.
 
 ## Use
 
-1. Open a ROS 2 workspace containing `package.xml` files.
+1. Open a workspace containing ROS `package.xml` files.
 2. Open the **ROS2 Inspector** Activity Bar view.
 3. Run **ROS2 Inspector: Refresh Workspace**.
-4. Expand Packages, Source Nodes, Deployments, Topics, Services, Actions, Interfaces, or Diagnostics.
-5. Run **ROS2 Inspector: Open Architecture Graph** for a visual model.
-6. Add a `ros2inspector_policy.yaml` and run **ROS2 Inspector: Validate Policy** for architecture policy checks.
+4. Expand entities to investigate relationships and findings.
+5. Use **Show Details**, **Reveal in Architecture Graph**, and **Open Source** to move between code and architecture.
+6. Run **ROS2 Inspector: Run Architecture Audit** for built-in connectivity/health findings.
+7. Run **ROS2 Inspector: Create Starter Policy** or point `ros2Inspector.policyFile` at a policy, then use **Validate Policy**.
 
-### Graph
+## Graph
 
 ![Communications graph](media/communications.png)
 
-The webview is fully self-contained. It does not load CDNs or remote JavaScript.
-
-### Diagnostics
-
-![Diagnostics preview](media/diagnostics-preview.png)
+The graph is a CSP-restricted, dependency-free webview with no CDN or runtime network access.
 
 ## Configuration
 
 | Setting | Default | Purpose |
-|---|---|---|
-| `ros2Inspector.executablePath` | `ros2inspector` | Analyzer command/path |
-| `ros2Inspector.workspacePath` | empty | Explicit ROS workspace root |
+|---|---:|---|
+| `ros2Inspector.executablePath` | `ros2inspector` | Analyzer command/path in extension host |
+| `ros2Inspector.workspacePath` | empty | Optional explicit static workspace root |
 | `ros2Inspector.minimumVersion` | `0.1.3` | Minimum supported CLI |
-| `ros2Inspector.refreshOnSave` | `true` | Re-analyze relevant source on save |
-| `ros2Inspector.policyFile` | `ros2inspector_policy.yaml` | Policy file |
-| `ros2Inspector.graph.maxNodes` | `350` | Graph rendering safety bound |
+| `ros2Inspector.refreshOnSave` | `true` | Re-analyze relevant files inside selected workspace |
+| `ros2Inspector.policyFile` | `ros2inspector_policy.yaml` | Policy path |
+| `ros2Inspector.analyzer.timeoutMs` | `120000` | Per-process timeout |
+| `ros2Inspector.analyzer.maxOutputMB` | `20` | Per-process stdout/stderr capture bound |
+| `ros2Inspector.graph.maxNodes` | `350` | Rendering safety bound (clamped 25–2000) |
 
-## Architecture
+## Privacy and security
 
-```text
-VS Code extension host
-        │
-        │ spawn(shell=false)
-        ▼
- ros2inspector >= 0.1.3
-        │
-        │ graph full --format json
-        ▼
- Unified Architecture Model
-   ├─ Explorer
-   ├─ Graph webview
-   ├─ Problems diagnostics
-   └─ Source navigation
-```
+- No telemetry.
+- No source code or workspace metadata is sent over the network.
+- No runtime network requests or remote webview assets.
+- No analyzer subprocess is started in an untrusted workspace.
+- All analyzer subprocesses use `shell: false`.
+- Webviews use restrictive CSPs and safe DOM rendering.
 
-The extension deliberately treats ROS2 Inspector as the source of truth instead of reimplementing ROS parsing in JavaScript.
-
-## Development
-
-```bash
-npm test
-npm run verify
-npm run package
-```
-
-Open this repository in VS Code and press **F5** to launch an Extension Development Host for manual UI testing.
-
-See [docs/TESTING.md](docs/TESTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/RELEASE.md](docs/RELEASE.md).
-
-## Security and privacy
-
-ROS2 Inspector for VS Code does not send source code or workspace metadata anywhere. See [SECURITY.md](SECURITY.md).
+The Python analyzer remains the source of truth for ROS parsing and architecture semantics. See [docs/ANALYZER_CONTRACT.md](docs/ANALYZER_CONTRACT.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/TESTING.md](docs/TESTING.md), and [SECURITY.md](SECURITY.md).
 
 ## License
 

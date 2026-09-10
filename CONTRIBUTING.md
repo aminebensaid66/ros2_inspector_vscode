@@ -1,7 +1,8 @@
 # Contributing
 
-1. Fork and create a focused branch.
-2. Run `npm run verify` before opening a pull request.
-3. For UX changes, also launch an Extension Development Host with F5 and test with a real ROS 2 workspace.
-4. Keep parsing/architecture semantics in the ROS2 Inspector Python project; this repository consumes its machine-readable UAM.
-5. Do not add runtime network calls, telemetry, or CDN-hosted webview dependencies without an explicit architecture/security discussion.
+1. Keep changes focused and preserve CommonJS/zero runtime npm dependencies unless a reviewed need requires otherwise.
+2. Run `npm run verify`.
+3. Install `ros2inspector==0.1.3` and run `npm run test:contract` when changing analyzer integration/model behavior.
+4. Run `npm run package` and inspect/install the VSIX for UI changes.
+5. Keep ROS parsing, architecture semantics, audits, and policy rules in the Python analyzer. The extension may normalize/reconcile only documented machine output.
+6. Preserve Workspace Trust, `shell: false`, no telemetry/network/CDNs, CSP-restricted webviews, bounded processes/graphs, and static-only behavior.

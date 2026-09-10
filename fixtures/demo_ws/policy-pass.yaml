@@ -1,0 +1,7 @@
+version: 1
+rules:
+  - type: no_circular_deps
+    severity: error
+  - type: maintainer_required
+    severity: warning
+    require_email: true

@@ -1,6 +1,8 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
-test('manifest uses workspace extension entrypoint',()=>{assert.equal(pkg.main,'./src/extension.js');assert.ok(pkg.engines.vscode)});
-test('manifest declares all user-facing commands',()=>{const ids=new Set(pkg.contributes.commands.map(c=>c.command));for(const id of ['ros2Inspector.refresh','ros2Inspector.openGraph','ros2Inspector.validate','ros2Inspector.openSource'])assert.ok(ids.has(id))});
+test('manifest is 0.2.0 and uses workspace extension entrypoint',()=>{assert.equal(pkg.version,'0.2.0');assert.equal(pkg.main,'./src/extension.js');assert.ok(pkg.engines.vscode)});
+test('manifest declares investigation commands',()=>{const ids=new Set(pkg.contributes.commands.map(c=>c.command));for(const id of ['ros2Inspector.refresh','ros2Inspector.openGraph','ros2Inspector.runAudit','ros2Inspector.validate','ros2Inspector.showFindings','ros2Inspector.createStarterPolicy','ros2Inspector.showDetails','ros2Inspector.revealInGraph','ros2Inspector.copyRosCommand'])assert.ok(ids.has(id),id)});
+test('context menus expose source details graph and copy actions',()=>{const ids=new Set(pkg.contributes.menus['view/item/context'].map(x=>x.command));for(const id of ['ros2Inspector.openSource','ros2Inspector.showDetails','ros2Inspector.revealInGraph','ros2Inspector.copyRosName','ros2Inspector.copyInterfaceType','ros2Inspector.copySourcePath','ros2Inspector.copyRosCommand','ros2Inspector.focusRelated'])assert.ok(ids.has(id),id)});
+test('manifest contributes analyzer safety limits',()=>{const p=pkg.contributes.configuration.properties;assert.ok(p['ros2Inspector.analyzer.timeoutMs']);assert.ok(p['ros2Inspector.analyzer.maxOutputMB']);});
 test('marketplace icon is PNG',()=>{assert.match(pkg.icon,/\.png$/);assert.ok(fs.existsSync(pkg.icon))});
 test('extension has zero runtime npm dependencies',()=>assert.equal(pkg.dependencies,undefined));

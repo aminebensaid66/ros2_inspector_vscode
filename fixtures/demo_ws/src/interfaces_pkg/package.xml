@@ -1,0 +1,1 @@
+<package format="3"><name>interfaces_pkg</name><version>0.1.0</version><description>Demo custom interfaces.</description><maintainer email="robot@example.com">Robot Team</maintainer><license>MIT</license><buildtool_depend>ament_cmake</buildtool_depend></package>

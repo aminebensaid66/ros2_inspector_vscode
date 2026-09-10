@@ -1,83 +1,104 @@
 'use strict';
 
 const vscode = require('vscode');
-const { graphSlice, sourceLocation } = require('./model');
+const { graphSlice, sourceLocationFromEntity, stableCompare } = require('./model');
 
 function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
+function safeJson(value) { return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'); }
+function nonce() { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; let value = ''; for (let i = 0; i < 32; i += 1) value += chars[Math.floor(Math.random() * chars.length)]; return value; }
+
+const DEFAULT_STATE = {
+  mode: 'comms', search: '', kinds: [], package: '', namespace: '', relationships: [],
+  hideIsolated: false, edgeLabels: true, focusId: '', hops: 0, selectedId: '', selectedEdgeId: '',
+  transform: { x: 36, y: 36, scale: 1 }
+};
+function normalizeGraphState(state = {}) {
+  const mode = ['comms', 'deps', 'full'].includes(state.mode) ? state.mode : 'comms';
+  const transform = state.transform && typeof state.transform === 'object' ? state.transform : {};
+  return {
+    ...DEFAULT_STATE, ...state, mode,
+    kinds: Array.isArray(state.kinds) ? state.kinds.filter(Boolean) : [],
+    relationships: Array.isArray(state.relationships) ? state.relationships.filter(Boolean) : [],
+    hideIsolated: Boolean(state.hideIsolated), edgeLabels: state.edgeLabels !== false,
+    hops: state.hops === 2 ? 2 : state.hops === 1 ? 1 : 0,
+    transform: {
+      x: Number.isFinite(Number(transform.x)) ? Number(transform.x) : 36,
+      y: Number.isFinite(Number(transform.y)) ? Number(transform.y) : 36,
+      scale: Number.isFinite(Number(transform.scale)) ? Math.min(4, Math.max(0.1, Number(transform.scale))) : 1
+    }
+  };
 }
 
-function safeJson(value) {
-  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+function graphPayload(model, state, maxNodes) {
+  const normalized = normalizeGraphState(state);
+  const slice = graphSlice(model, normalized.mode, maxNodes, normalized);
+  slice.nodes = slice.nodes.map(node => {
+    const entity = model.entityById.get(node.id);
+    const location = sourceLocationFromEntity(entity, model);
+    return { ...node, has_source: Boolean(location), source_location: location || null };
+  });
+  return {
+    slice, state: normalized,
+    packages: [...new Set([...model.entityById.values()].map(entity => entity.data.package).filter(Boolean))].sort(stableCompare),
+    namespaces: [...new Set([...model.entityById.values()].map(entity => entity.data.namespace).filter(Boolean))].sort(stableCompare),
+    kinds: [...new Set([...model.entityById.values()].map(entity => entity.kind).filter(Boolean))].sort(stableCompare),
+    relationships: [...new Set(model.relationships.map(item => item.rel))].sort(stableCompare)
+  };
 }
 
-function nonce() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let value = '';
-  for (let i = 0; i < 32; i += 1) value += chars[Math.floor(Math.random() * chars.length)];
-  return value;
-}
-
-function graphHtml(model, mode, maxNodes, nonceValue = nonce()) {
-  const graph = graphSlice(model, mode, maxNodes);
-  const banner = graph.truncated
-    ? `<div class="banner">Showing ${graph.nodes.length} of ${graph.totalNodes} nodes. Increase <code>ros2Inspector.graph.maxNodes</code> if needed.</div>`
-    : '';
-  return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'nonce-${nonceValue}'; script-src 'nonce-${nonceValue}';">
-<style nonce="${nonceValue}">
-:root{color-scheme:light dark} body{margin:0;font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background);overflow:hidden}
-.toolbar{height:46px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background)}
-button,select,input{color:var(--vscode-input-foreground);background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);padding:6px 8px;border-radius:4px} button{cursor:pointer}.spacer{flex:1}.banner{padding:7px 12px;background:var(--vscode-inputValidation-warningBackground);border-bottom:1px solid var(--vscode-inputValidation-warningBorder)}
-#viewport{position:absolute;top:47px;bottom:0;left:0;right:0;overflow:auto}.banner+#viewport{top:79px} svg{min-width:100%;min-height:100%}.edge{stroke:var(--vscode-descriptionForeground);stroke-width:1.2;opacity:.55}.edgeLabel{font-size:10px;fill:var(--vscode-descriptionForeground)}
-.node rect{fill:var(--vscode-editorWidget-background);stroke:var(--vscode-focusBorder);stroke-width:1}.node text{font-size:12px;fill:var(--vscode-foreground);pointer-events:none}.node{cursor:pointer}.node.dim{opacity:.12}.edge.dim,.edgeLabel.dim{opacity:.05}.selected rect{stroke-width:3}
-.kind-Package rect{stroke:#4aa5f0}.kind-Node rect{stroke:#e5a84b}.kind-Deployment rect{stroke:#a979e8}.kind-Topic rect{stroke:#4fc3a1}.kind-Service rect{stroke:#df80a6}.kind-Action rect{stroke:#e67b70}.kind-Interface rect{stroke:#7ba7ff}
-#details{position:absolute;right:16px;top:62px;max-width:360px;max-height:55vh;overflow:auto;padding:12px;background:var(--vscode-editorWidget-background);border:1px solid var(--vscode-widget-border);box-shadow:0 4px 18px #0004;border-radius:6px;display:none;white-space:pre-wrap}.muted{color:var(--vscode-descriptionForeground)}
-</style></head><body>
-<div class="toolbar"><strong>ROS2 Inspector</strong><select id="mode"><option value="comms"${mode==='comms'?' selected':''}>Communications</option><option value="deps"${mode==='deps'?' selected':''}>Dependencies</option><option value="full"${mode==='full'?' selected':''}>Full architecture</option></select><input id="search" type="search" placeholder="Filter entities…" aria-label="Filter entities"><button id="fit">Fit</button><span class="spacer"></span><span class="muted">${graph.nodes.length} nodes · ${graph.edges.length} edges</span></div>${banner}<div id="viewport"><svg id="graph" role="img" aria-label="ROS 2 architecture graph"></svg></div><div id="details"></div>
-<script nonce="${nonceValue}">const vscode=acquireVsCodeApi(); const DATA=${safeJson(graph)};
-const svg=document.getElementById('graph'), details=document.getElementById('details'), search=document.getElementById('search');
-const NS='http://www.w3.org/2000/svg', nodeW=170,nodeH=48,colGap=250,rowGap=78,pad=60; const order=['Package','Node','Deployment','Topic','Service','Action','Interface'];
-const columns=new Map(order.map((k,i)=>[k,i])); const grouped=new Map(); DATA.nodes.forEach(n=>{const k=n.kind||'Other'; if(!grouped.has(k))grouped.set(k,[]); grouped.get(k).push(n)});
-const pos=new Map(); let maxRows=1; [...grouped.entries()].forEach(([kind,nodes])=>{maxRows=Math.max(maxRows,nodes.length); const c=columns.has(kind)?columns.get(kind):order.length; nodes.sort((a,b)=>String(a.name||a.id).localeCompare(String(b.name||b.id))).forEach((n,r)=>pos.set(n.id,{x:pad+c*colGap,y:pad+r*rowGap}))});
-svg.setAttribute('width',pad*2+(order.length+1)*colGap); svg.setAttribute('height',pad*2+maxRows*rowGap);
-const edgeLayer=document.createElementNS(NS,'g'), nodeLayer=document.createElementNS(NS,'g'); svg.append(edgeLayer,nodeLayer);
-function textEl(tag,attrs,text){const e=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v)); if(text!==undefined)e.textContent=text;return e}
-DATA.edges.forEach((e,i)=>{const a=pos.get(e.source),b=pos.get(e.target);if(!a||!b)return; const x1=a.x+nodeW,y1=a.y+nodeH/2,x2=b.x,y2=b.y+nodeH/2; const line=textEl('line',{x1,y1,x2,y2,class:'edge','data-source':e.source,'data-target':e.target});edgeLayer.append(line); const label=textEl('text',{x:(x1+x2)/2,y:(y1+y2)/2-4,class:'edgeLabel','data-source':e.source,'data-target':e.target},e.rel||'');edgeLayer.append(label)});
-DATA.nodes.forEach(n=>{const p=pos.get(n.id);const g=textEl('g',{transform:'translate('+p.x+' '+p.y+')',class:'node kind-'+(n.kind||'Other'),'data-id':n.id,'data-label':String(n.name||n.id).toLowerCase()});g.append(textEl('rect',{width:nodeW,height:nodeH,rx:7,ry:7}));g.append(textEl('text',{x:10,y:19},String(n.name||n.id).slice(0,24)));g.append(textEl('text',{x:10,y:36,class:'muted'},String(n.kind||'').slice(0,24)));g.addEventListener('click',()=>selectNode(n,g));nodeLayer.append(g)});
-function selectNode(n,g){document.querySelectorAll('.selected').forEach(x=>x.classList.remove('selected'));g.classList.add('selected'); const keys=['kind','name','package','language','executable','namespace','msg_type','srv_type','action_type','confidence','resolution','file_path','line']; const lines=keys.filter(k=>n[k]!==undefined&&n[k]!==null&&n[k]!=='').map(k=>k+': '+String(n[k])); details.textContent=lines.join('\\n'); const btn=document.createElement('button');btn.textContent='Open source';btn.style.marginTop='10px';btn.onclick=()=>vscode.postMessage({type:'openSource',id:n.id});details.append(document.createElement('br'),btn);details.style.display='block'}
-function applyFilter(){const q=search.value.trim().toLowerCase();document.querySelectorAll('.node').forEach(n=>n.classList.toggle('dim',q&&!n.dataset.label.includes(q)));document.querySelectorAll('.edge,.edgeLabel').forEach(e=>{const s=document.querySelector('.node[data-id="'+CSS.escape(e.dataset.source)+'"]'),t=document.querySelector('.node[data-id="'+CSS.escape(e.dataset.target)+'"]');e.classList.toggle('dim',q&&(s?.classList.contains('dim')||t?.classList.contains('dim')))});} search.addEventListener('input',applyFilter);
-document.getElementById('mode').addEventListener('change',e=>vscode.postMessage({type:'mode',mode:e.target.value}));document.getElementById('fit').addEventListener('click',()=>{document.getElementById('viewport').scrollTo({left:0,top:0,behavior:'smooth'})});
-</script></body></html>`;
+function graphHtml(model, stateOrMode = DEFAULT_STATE, maxNodes = 350, nonceValue = nonce()) {
+  const state = typeof stateOrMode === 'string' ? { ...DEFAULT_STATE, mode: stateOrMode } : normalizeGraphState(stateOrMode);
+  const payload = graphPayload(model, state, maxNodes);
+  const truncated = payload.slice.truncated ? `Showing ${payload.slice.displayedNodes} of ${payload.slice.totalNodes} filtered entities (limit ${payload.slice.limit}).` : `${payload.slice.totalNodes} filtered entities.`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'nonce-${nonceValue}'; script-src 'nonce-${nonceValue}';"><style nonce="${nonceValue}">
+  :root{color-scheme:light dark}*{box-sizing:border-box}body{margin:0;font:12px var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background);height:100vh;display:grid;grid-template-rows:auto 1fr}.bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 9px;border-bottom:1px solid var(--vscode-panel-border);background:var(--vscode-sideBar-background)}button,select,input{font:inherit;color:var(--vscode-input-foreground);background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:3px;padding:4px 7px}button{cursor:pointer;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground)}button:hover{background:var(--vscode-button-secondaryHoverBackground)}#search{width:200px}.workspace{position:relative;overflow:hidden}.canvas{width:100%;height:100%;touch-action:none;cursor:grab}.canvas.panning{cursor:grabbing}.node rect{fill:var(--vscode-editorWidget-background);stroke:var(--vscode-panel-border);stroke-width:1.4}.node text{fill:var(--vscode-foreground);pointer-events:none}.node .sub{fill:var(--vscode-descriptionForeground);font-size:10px}.node{cursor:pointer;outline:none}.node:focus rect,.node.selected rect{stroke:var(--vscode-focusBorder);stroke-width:3}.node.error rect{stroke:var(--vscode-errorForeground)}.node.warning rect{stroke:var(--vscode-editorWarning-foreground)}.edge{stroke:var(--vscode-descriptionForeground);stroke-width:1.4;fill:none;marker-end:url(#arrow)}.edgeHit{stroke:transparent;stroke-width:12;fill:none;cursor:pointer}.edge.selected{stroke:var(--vscode-focusBorder);stroke-width:3}.edgeLabel{fill:var(--vscode-descriptionForeground);font-size:10px;pointer-events:none}.panel{position:absolute;right:10px;top:10px;width:min(370px,42vw);max-height:calc(100% - 20px);overflow:auto;background:var(--vscode-editorWidget-background);border:1px solid var(--vscode-widget-border);box-shadow:0 4px 16px #0004;padding:12px;display:none}.panel h3{margin:0 0 8px;font-size:14px}.panel pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0;color:var(--vscode-descriptionForeground)}.legend{position:absolute;left:10px;bottom:10px;background:var(--vscode-editorWidget-background);border:1px solid var(--vscode-widget-border);padding:6px 8px;display:flex;gap:9px;flex-wrap:wrap;max-width:70%}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;border:2px solid var(--vscode-descriptionForeground);margin-right:4px}.status{margin-left:auto;color:var(--vscode-descriptionForeground)}.filters{display:flex;gap:5px}.check{display:flex;align-items:center;gap:3px}.hidden{display:none}</style></head><body>
+  <div class="bar"><select id="mode"><option value="comms">Communications</option><option value="deps">Dependencies</option><option value="full">Full architecture</option></select><input id="search" type="search" placeholder="Search name, ID, package, namespace, type…"><select id="kind"><option value="">All kinds</option></select><select id="package"><option value="">All packages</option></select><select id="namespace"><option value="">All namespaces</option></select><select id="relationship"><option value="">All relationships</option></select><label class="check"><input id="isolated" type="checkbox"> hide isolated</label><label class="check"><input id="labels" type="checkbox"> edge labels</label><button id="zoomIn" title="Zoom in">＋</button><button id="zoomOut" title="Zoom out">－</button><button id="fit">Fit</button><button id="reset">Reset</button><button id="focus1">1-hop</button><button id="focus2">2-hop</button><button id="clearFocus">Clear focus</button><span class="status">${escapeHtml(truncated)}</span></div>
+  <div class="workspace"><svg id="canvas" class="canvas" role="application" aria-label="ROS2 Inspector architecture graph"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="context-stroke"/></marker></defs><g id="viewport"><g id="edges"></g><g id="nodes"></g></g></svg><aside id="details" class="panel" aria-live="polite"></aside><div id="legend" class="legend"></div></div>
+  <script nonce="${nonceValue}">const vscode=acquireVsCodeApi();const DATA=${safeJson(payload)};let state=DATA.state;const svg=document.getElementById('canvas'),viewport=document.getElementById('viewport'),nodesLayer=document.getElementById('nodes'),edgesLayer=document.getElementById('edges'),details=document.getElementById('details');
+  const NS='http://www.w3.org/2000/svg';const mk=(tag,attrs={},text)=>{const n=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,String(v)));if(text!==undefined)n.textContent=String(text);return n};
+  const postState=()=>vscode.postMessage({type:'state',state});const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));function applyTransform(){viewport.setAttribute('transform','translate('+state.transform.x+' '+state.transform.y+') scale('+state.transform.scale+')')};applyTransform();
+  function fillSelect(id,values,current){const s=document.getElementById(id);values.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.append(o)});s.value=current||''}document.getElementById('mode').value=state.mode;document.getElementById('search').value=state.search;document.getElementById('isolated').checked=state.hideIsolated;document.getElementById('labels').checked=state.edgeLabels;fillSelect('kind',DATA.kinds,state.kinds[0]);fillSelect('package',DATA.packages,state.package);fillSelect('namespace',DATA.namespaces,state.namespace);fillSelect('relationship',DATA.relationships,state.relationships[0]);
+  const colors={Package:'package',Node:'symbol-class',Deployment:'run',Topic:'radio-tower',Service:'server-process',Action:'play-circle',Interface:'symbol-interface'};const colWidth=230,rowHeight=84,nodeW=180,nodeH=52;const kinds=[...new Set(DATA.slice.nodes.map(n=>n.kind))].sort();const byKind=new Map(kinds.map((k,i)=>[k,{i,count:0}]));const pos=new Map();DATA.slice.nodes.forEach(n=>{const k=byKind.get(n.kind);pos.set(n.id,{x:k.i*colWidth,y:(k.count++)*rowHeight})});
+  function edgePath(a,b){const x1=a.x+nodeW,y1=a.y+nodeH/2,x2=b.x,y2=b.y+nodeH/2;const dx=Math.max(40,Math.abs(x2-x1)/2);return 'M'+x1+','+y1+' C'+(x1+dx)+','+y1+' '+(x2-dx)+','+y2+' '+x2+','+y2}
+  DATA.slice.edges.forEach(e=>{const a=pos.get(e.source),b=pos.get(e.target);if(!a||!b)return;const d=edgePath(a,b),line=mk('path',{d,class:'edge','data-id':e.id});const hit=mk('path',{d,class:'edgeHit','data-id':e.id,tabindex:'0'});hit.addEventListener('click',ev=>{ev.stopPropagation();selectEdge(e,line)});hit.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectEdge(e,line)}});edgesLayer.append(line,hit);if(state.edgeLabels){const label=mk('text',{x:(a.x+b.x+nodeW)/2,y:(a.y+b.y+nodeH)/2-6,class:'edgeLabel'},e.rel||'');edgesLayer.append(label)}});
+  DATA.slice.nodes.forEach(n=>{const p=pos.get(n.id),sev=n.finding_severity==='error'?' error':n.finding_severity==='warning'?' warning':'';const g=mk('g',{transform:'translate('+p.x+' '+p.y+')',class:'node'+sev,'data-id':n.id,tabindex:'0',role:'button','aria-label':(n.kind||'Entity')+' '+(n.name||n.id)});g.append(mk('rect',{width:nodeW,height:nodeH,rx:7,ry:7}));g.append(mk('text',{x:10,y:20},String(n.name||n.id).slice(0,28)));g.append(mk('text',{x:10,y:39,class:'sub'},String(n.kind||'').slice(0,24)));g.addEventListener('click',ev=>{ev.stopPropagation();selectNode(n,g)});g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode(n,g)}});nodesLayer.append(g)});
+  function clearSelection(){document.querySelectorAll('.selected').forEach(n=>n.classList.remove('selected'));details.style.display='none';state.selectedId='';state.selectedEdgeId=''}
+  function addButton(label,handler){const b=document.createElement('button');b.textContent=label;b.addEventListener('click',handler);details.append(b)}function addPre(object){const pre=document.createElement('pre');pre.textContent=Object.entries(object).filter(([k,v])=>v!==undefined&&v!==null&&v!==''&&!['id'].includes(k)).map(([k,v])=>k+': '+(typeof v==='object'?JSON.stringify(v):String(v))).join('\n');details.append(pre)}
+  function selectNode(n,g,notify=true){clearSelection();g.classList.add('selected');state.selectedId=n.id;details.textContent='';const h=document.createElement('h3');h.textContent=(n.kind||'Entity')+': '+(n.name||n.id);details.append(h);addPre(n);if(n.has_source)addButton('Open source',()=>vscode.postMessage({type:'openSource',id:n.id}));addButton('Show details',()=>vscode.postMessage({type:'showDetails',id:n.id}));addButton('Focus 1-hop',()=>{state.focusId=n.id;state.hops=1;postState()});addButton('Focus 2-hop',()=>{state.focusId=n.id;state.hops=2;postState()});details.style.display='block';if(notify)postState()}
+  function selectEdge(e,line,notify=true){clearSelection();line.classList.add('selected');state.selectedEdgeId=e.id;details.textContent='';const h=document.createElement('h3');h.textContent='Relationship: '+e.rel;details.append(h);addPre(e);if((e.file_path||e.file)&&Number(e.line||1)>=1)addButton('Open source',()=>vscode.postMessage({type:'openEdgeSource',file:e.file_path||e.file,line:Number(e.line||1)}));details.style.display='block';if(notify)postState()}
+  const rerender=(key,value)=>{state[key]=value;state.selectedId='';state.selectedEdgeId='';postState()};let searchTimer;document.getElementById('search').addEventListener('input',e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>rerender('search',e.target.value),180)});document.getElementById('mode').addEventListener('change',e=>rerender('mode',e.target.value));document.getElementById('kind').addEventListener('change',e=>rerender('kinds',e.target.value?[e.target.value]:[]));document.getElementById('package').addEventListener('change',e=>rerender('package',e.target.value));document.getElementById('namespace').addEventListener('change',e=>rerender('namespace',e.target.value));document.getElementById('relationship').addEventListener('change',e=>rerender('relationships',e.target.value?[e.target.value]:[]));document.getElementById('isolated').addEventListener('change',e=>rerender('hideIsolated',e.target.checked));document.getElementById('labels').addEventListener('change',e=>rerender('edgeLabels',e.target.checked));
+  function zoomAt(factor,cx=svg.clientWidth/2,cy=svg.clientHeight/2){const old=state.transform.scale,next=clamp(old*factor,.1,4),ratio=next/old;state.transform.x=cx-(cx-state.transform.x)*ratio;state.transform.y=cy-(cy-state.transform.y)*ratio;state.transform.scale=next;applyTransform();postState()}document.getElementById('zoomIn').onclick=()=>zoomAt(1.2);document.getElementById('zoomOut').onclick=()=>zoomAt(1/1.2);svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect();zoomAt(e.deltaY<0?1.12:1/1.12,e.clientX-r.left,e.clientY-r.top)},{passive:false});
+  let drag=null;svg.addEventListener('pointerdown',e=>{if(e.target.closest('.node')||e.target.closest('.edgeHit'))return;drag={x:e.clientX,y:e.clientY,tx:state.transform.x,ty:state.transform.y};svg.setPointerCapture(e.pointerId);svg.classList.add('panning')});svg.addEventListener('pointermove',e=>{if(!drag)return;state.transform.x=drag.tx+e.clientX-drag.x;state.transform.y=drag.ty+e.clientY-drag.y;applyTransform()});svg.addEventListener('pointerup',()=>{if(!drag)return;drag=null;svg.classList.remove('panning');postState()});
+  function fit(){if(!DATA.slice.nodes.length)return;const box=viewport.getBBox(),w=svg.clientWidth,h=svg.clientHeight,scale=clamp(Math.min((w-70)/Math.max(1,box.width),(h-70)/Math.max(1,box.height)),.1,2);state.transform={scale,x:(w-box.width*scale)/2-box.x*scale,y:(h-box.height*scale)/2-box.y*scale};applyTransform();postState()}document.getElementById('fit').onclick=fit;document.getElementById('reset').onclick=()=>{state.transform={x:36,y:36,scale:1};applyTransform();postState()};document.getElementById('focus1').onclick=()=>{if(state.selectedId){state.focusId=state.selectedId;state.hops=1;postState()}};document.getElementById('focus2').onclick=()=>{if(state.selectedId){state.focusId=state.selectedId;state.hops=2;postState()}};document.getElementById('clearFocus').onclick=()=>{state.focusId='';state.hops=0;postState()};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(state.focusId){state.focusId='';state.hops=0;postState()}else{clearSelection();postState()}}});svg.addEventListener('click',()=>{clearSelection();postState()});
+  const legend=document.getElementById('legend');DATA.kinds.forEach(k=>{const span=document.createElement('span');const dot=document.createElement('i');dot.className='dot';span.append(dot,document.createTextNode(k));legend.append(span)});if(DATA.slice.truncated){const span=document.createElement('span');span.textContent='⚠ truncated';legend.append(span)}
+  if(state.selectedId){const g=document.querySelector('.node[data-id="'+CSS.escape(state.selectedId)+'"]');const n=DATA.slice.nodes.find(n=>n.id===state.selectedId);if(g&&n)selectNode(n,g,false)}if(state.selectedEdgeId){const e=DATA.slice.edges.find(e=>e.id===state.selectedEdgeId),line=e&&document.querySelector('.edge[data-id="'+CSS.escape(e.id)+'"]');if(e&&line)selectEdge(e,line,false)}
+  </script></body></html>`;
 }
 
 class GraphPanel {
-  constructor(context, model, maxNodes, onOpenSource) {
-    this.context = context;
-    this.model = model;
-    this.maxNodes = maxNodes;
-    this.mode = 'comms';
-    this.onOpenSource = onOpenSource;
-    this.panel = vscode.window.createWebviewPanel('ros2Inspector.graph', 'ROS2 Inspector Architecture', vscode.ViewColumn.One, { enableScripts: true, retainContextWhenHidden: true });
-    this.panel.webview.onDidReceiveMessage(message => this._message(message));
+  constructor(context, model, maxNodes, callbacks = {}) {
+    this.context = context; this.model = model; this.maxNodes = maxNodes; this.callbacks = callbacks; this.state = normalizeGraphState();
+    this.panel = vscode.window.createWebviewPanel('ros2Inspector.graph', 'ROS2 Inspector Architecture', vscode.ViewColumn.One, {
+      enableScripts: true, retainContextWhenHidden: true, localResourceRoots: []
+    });
+    this._messageDisposable = this.panel.webview.onDidReceiveMessage(message => this._message(message));
+    this.panel.onDidDispose(() => { this._messageDisposable?.dispose(); this.callbacks.onDispose?.(); });
     this.render();
   }
-  update(model) { this.model = model; this.render(); }
-  render() { this.panel.webview.html = graphHtml(this.model, this.mode, this.maxNodes); }
+  update(model) { this.model = model; if (this.state.focusId && !model.entityById.has(this.state.focusId)) { this.state.focusId = ''; this.state.hops = 0; } if (this.state.selectedId && !model.entityById.has(this.state.selectedId)) this.state.selectedId = ''; this.render(); }
+  setMaxNodes(value) { this.maxNodes = value; this.render(); }
+  revealEntity(entityId) { if (!this.model.entityById.has(entityId)) return; this.state.focusId = entityId; this.state.hops = 1; this.state.selectedId = entityId; this.render(); this.panel.reveal(vscode.ViewColumn.One); }
+  render() { this.panel.webview.html = graphHtml(this.model, this.state, this.maxNodes); }
   _message(message) {
-    if (message?.type === 'mode' && ['comms','deps','full'].includes(message.mode)) { this.mode = message.mode; this.render(); return; }
-    if (message?.type === 'openSource' && message.id) {
-      const node = this.model.graphById.get(message.id);
-      if (!node) return;
-      let candidate = node;
-      if (node.kind === 'Deployment' && node.source_node_id) candidate = this.model.graphById.get(node.source_node_id) || node;
-      const location = sourceLocation(node.kind === 'Deployment' ? 'deployments' : 'nodes', candidate, this.model);
-      if (location) this.onOpenSource(location);
-    }
+    if (!message || typeof message !== 'object') return;
+    if (message.type === 'state' && message.state) { this.state = normalizeGraphState(message.state); this.render(); return; }
+    if (message.type === 'openSource' && message.id) this.callbacks.onOpenSource?.(message.id);
+    else if (message.type === 'openEdgeSource' && message.file) this.callbacks.onOpenLocation?.({ file: message.file, line: message.line });
+    else if (message.type === 'showDetails' && message.id) this.callbacks.onShowDetails?.(message.id);
   }
 }
 
-module.exports = { GraphPanel, graphHtml, escapeHtml, safeJson };
+module.exports = { GraphPanel, graphHtml, graphPayload, normalizeGraphState, escapeHtml, safeJson, DEFAULT_STATE };
