@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Fixed the graph webview JavaScript error that could leave the architecture graph blank.
+- Added deterministic architecture-aware node layout with crossing reduction.
+- Added dedicated routing for parallel, reverse-direction, same-column, and self-loop relationships.
+- Improved graph Fit bounds, relationship line styles, edge-label legibility, and full-name tooltips.
+- Added generated-webview syntax validation and focused graph layout regression coverage.
+- Added project author attribution for Amine Bensaid.
+
 ## 0.2.0
 
 - Upgraded the Architecture Explorer from flat inventory lists to expandable relationship-aware entities.

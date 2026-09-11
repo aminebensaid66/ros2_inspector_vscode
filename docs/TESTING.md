@@ -30,7 +30,7 @@ npm run package
 npm run validate:vsix
 ```
 
-The dependency-free packager creates `ros2-inspector-vscode-0.2.0.vsix`. Validation checks required runtime modules and confirms tests, fixtures, and packaging scripts are not shipped.
+The dependency-free packager creates `ros2-inspector-vscode-0.3.0.vsix`. Validation checks required runtime modules and confirms tests, fixtures, and packaging scripts are not shipped.
 
 ## Manual VS Code acceptance
 

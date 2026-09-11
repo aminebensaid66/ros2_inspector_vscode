@@ -1,10 +1,12 @@
 # ROS2 Inspector for VS Code
 
+Created by **Amine Bensaid**.
+
 Turn the released **ROS2 Inspector** static model into an architecture investigation workspace inside Visual Studio Code.
 
 ![ROS2 Inspector VS Code preview](media/product-preview.png)
 
-## What 0.2.0 adds
+## What 0.3.0 includes
 
 - Relationship-aware, expandable explorer instead of flat inventories.
 - Source nodes aggregate their launch deployments, publishers/subscribers, services, actions, interfaces, and findings.
@@ -43,7 +45,7 @@ npm run verify
 npm run package
 ```
 
-Install `ros2-inspector-vscode-0.2.0.vsix` with **Extensions → … → Install from VSIX…**.
+Install `ros2-inspector-vscode-0.3.0.vsix` with **Extensions → … → Install from VSIX…**.
 
 No `npm install` is required: the extension has zero npm runtime dependencies and uses Node/VS Code built-ins.
 

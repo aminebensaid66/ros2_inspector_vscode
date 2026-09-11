@@ -2,8 +2,9 @@
   "name": "ros2-inspector-vscode",
   "displayName": "ROS2 Inspector",
   "description": "Static ROS 2 architecture exploration, diagnostics and policy checks inside VS Code.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "aminebensaid66",
+  "author": "Amine Bensaid",
   "license": "MIT",
   "icon": "media/icon.png",
   "engines": {
