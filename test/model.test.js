@@ -14,7 +14,39 @@ test('missing and duplicate graph IDs are made deterministic', () => { const b =
 test('category counts preserve empty and populated categories', () => { const rows = categoryRows(model()); assert.equal(rows.find(x => x.key === 'deployments').count, 1); assert.ok(rows.some(x => x.key === 'auditFindings')); });
 test('deployment resolves launch source location first', () => { const m = model(); const d = m.entityById.get('deployment:camera'); assert.deepEqual(sourceLocation('deployments', d.data, m), { file: '/ws/src/demo/launch/demo.launch.py', line: 1 }); });
 test('malformed source line falls back safely to line one', () => { assert.deepEqual(sourceLocation('nodes', { file_path: '/x.py', line: 'bad' }, null), { file: '/x.py', line: 1 }); });
-test('reconciles orphan static graph edges through nodes --show-connections', () => { const m = model(); assert.ok(m.orphanEdges.some(e => e.source === 'static')); const deployment = m.entityById.get('deployment:camera'); const pubs = relationshipTargets(m, deployment.id, 'publishes'); assert.equal(pubs[0].name, '/robot/image_raw'); });
+test('uses complete graph edges for deployment communications', () => { const m = model(); assert.equal(m.orphanEdges.length, 0); const deployment = m.entityById.get('deployment:camera'); const pubs = relationshipTargets(m, deployment.id, 'publishes'); assert.equal(pubs[0].name, '/robot/image_raw'); });
+test('keeps unresolved communication endpoints separate across graph and fallback evidence', () => {
+  for (const [category, kind, firstRole, secondRole, firstField, secondField] of [
+    ['topics', 'Topic', 'publishes', 'subscribes', 'publishers', 'subscriptions'],
+    ['services', 'Service', 'provides', 'calls', 'services', 'clients'],
+    ['actions', 'Action', 'provides', 'calls', 'action_servers', 'action_clients']
+  ]) {
+    const ids = [`unresolved:${kind.toLowerCase()}:pub`, `unresolved:${kind.toLowerCase()}:sub`];
+    const nodes = ['Pub', 'Sub'].map((name, index) => ({
+      name, package: 'demo', file_path: `/ws/${name}.py`, [index ? secondField : firstField]: [{ name: '<dynamic>' }]
+    }));
+    const raw = {
+      nodes,
+      [category]: [{ name: '<dynamic>' }, { name: '<dynamic>' }],
+      graph: {
+        nodes: [
+          { id: 'node:pub', kind: 'Node', name: 'Pub', package: 'demo', file_path: '/ws/Pub.py' },
+          { id: 'node:sub', kind: 'Node', name: 'Sub', package: 'demo', file_path: '/ws/Sub.py' },
+          ...ids.map(id => ({ id, kind, name: '<dynamic>', resolution: 'unresolved' }))
+        ],
+        edges: [
+          { source: 'node:pub', target: ids[0], rel: firstRole },
+          { source: 'node:sub', target: ids[1], rel: secondRole }
+        ]
+      }
+    };
+    const nodeConnections = nodes.map((node, index) => ({ ...node, connections: [{ kind: kind.toLowerCase(), name: '<dynamic>', role: index ? secondRole : firstRole }] }));
+    const m = normalize(raw, { nodeConnections });
+    assert.deepEqual(m.entitiesByCategory.get(category).map(entity => entity.id).sort(), ids.sort());
+    assert.deepEqual(m.relationships.filter(rel => rel.target === ids[0]).map(rel => rel.rel), [firstRole]);
+    assert.deepEqual(m.relationships.filter(rel => rel.target === ids[1]).map(rel => rel.rel), [secondRole]);
+  }
+});
 test('incoming and outgoing indexes are consistent', () => { const m = model(); const rel = m.relationships.find(r => r.rel === 'deploys_as'); assert.ok(m.outgoing.get(rel.source).some(x => x.id === rel.id)); assert.ok(m.incoming.get(rel.target).some(x => x.id === rel.id)); });
 test('equivalent relationships are deduplicated', () => { const m = model(); const keys = m.relationships.map(r => `${r.source}|${r.rel}|${r.target}`); assert.equal(new Set(keys).size, keys.length); });
 test('source nodes and deployments keep relationship identity separate', () => { const m = model(); const source = [...m.entityById.values()].find(e => e.kind === 'Node' && e.name === 'camera_node'); const deployment = m.entityById.get('deployment:camera'); assert.notEqual(source.id, deployment.id); assert.ok(entityRelationships(m, source.id).some(r => r.target === deployment.id)); });

@@ -46,6 +46,7 @@ assert(violating.data.violations.every(v => typeof v.policy_file === 'string' &&
 
 const graphIds = new Set(graph.graph.nodes.map(n => n.id));
 const orphanEdges = graph.graph.edges.filter(e => !graphIds.has(e.source) || !graphIds.has(e.target));
+assert(orphanEdges.length === 0, `graph JSON contains ${orphanEdges.length} edges with missing endpoints`);
 console.log(JSON.stringify({
   version: '0.1.3', packages: graph.summary.packages, nodes: graph.summary.nodes,
   deployments: graph.summary.deployments, topics: graph.summary.topics, services: graph.summary.services,

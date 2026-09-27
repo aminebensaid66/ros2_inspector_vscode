@@ -39,7 +39,7 @@ function sampleBundle() {
       edges: [
         { source: 'pkg:demo', target: 'pkg:interfaces_pkg', rel: 'depends_on' },
         { source: 'node:demo/CameraNode', target: 'deployment:camera', rel: 'deploys_as' },
-        { source: 'static', target: 'topic:/robot/image_raw', rel: 'publishes', file_path: '/ws/src/demo/camera.py', line: 8, deployment_id: 'deployment:camera' },
+        { source: 'deployment:camera', target: 'topic:/robot/image_raw', rel: 'publishes', data_source: 'static', file_path: '/ws/src/demo/camera.py', line: 8, deployment_id: 'deployment:camera' },
         { source: 'node:demo/CameraNode', target: 'iface:interfaces_pkg/Status', rel: 'uses_interface' }
       ]
     }

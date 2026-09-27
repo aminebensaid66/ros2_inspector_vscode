@@ -63,6 +63,10 @@ function canonicalCommunicationId(kind, name) {
   return `${prefix}:${name || '<unknown>'}`;
 }
 
+function isUnresolvedCommunication(item) {
+  return item?.name === '<dynamic>' || item?.resolution === 'unresolved' || text(item?.id).startsWith('unresolved:');
+}
+
 function normalize(raw, extras = {}) {
   const data = asObject(raw);
   const graph = asObject(data.graph);
@@ -174,21 +178,38 @@ function normalize(raw, extras = {}) {
     if (candidate) model.graphIdToEntityId.set(candidate.id, entity.id);
   });
 
-  // Aggregate comm entities by public ROS name instead of actor-specific UAM IDs.
+  // Resolved names identify shared ROS entities. Unresolved graph IDs identify
+  // individual evidence records and must never be merged by their display name.
   for (const [category, kind] of [['topics', 'Topic'], ['services', 'Service'], ['actions', 'Action']]) {
     const source = model[category];
     const graphNodes = graphCandidates(kind);
-    const names = new Set(source.map(item => text(item.name)).filter(Boolean));
-    graphNodes.forEach(item => names.add(text(item.name)));
-    const sourceByName = new Map(source.map(item => [text(item.name), item]));
+    const names = new Set(source.filter(item => !isUnresolvedCommunication(item)).map(item => text(item.name)).filter(Boolean));
+    graphNodes.filter(item => !isUnresolvedCommunication(item)).forEach(item => names.add(text(item.name)));
+    const sourceByName = new Map(source.filter(item => !isUnresolvedCommunication(item)).map(item => [text(item.name), item]));
     const rebuilt = [];
     for (const name of [...names].filter(Boolean).sort(stableCompare)) {
-      const matching = graphNodes.filter(node => text(node.name) === name);
+      const matching = graphNodes.filter(node => !isUnresolvedCommunication(node) && text(node.name) === name);
       const merged = { ...(sourceByName.get(name) || {}), ...(matching[0] || {}), name };
       delete merged.id;
       rebuilt.push(merged);
       const entity = addEntity(category, merged, canonicalCommunicationId(kind, name), kind);
       matching.forEach(node => model.graphIdToEntityId.set(node.id, entity.id));
+    }
+    const unresolvedNodes = graphNodes.filter(isUnresolvedCommunication).sort((a, b) => stableCompare(a.id, b.id));
+    for (const node of unresolvedNodes) {
+      const item = { ...node };
+      delete item.id;
+      rebuilt.push(item);
+      const entity = addEntity(category, item, node.id, kind);
+      model.graphIdToEntityId.set(node.id, entity.id);
+    }
+    if (!unresolvedNodes.length) {
+      source.filter(isUnresolvedCommunication).forEach((item, index) => {
+        const copy = { ...item };
+        delete copy.id;
+        rebuilt.push(copy);
+        addEntity(category, copy, `unresolved:${kind.toLowerCase()}:summary:${index}`, kind);
+      });
     }
     model[category] = rebuilt;
   }
@@ -257,7 +278,7 @@ function normalize(raw, extras = {}) {
     for (const connection of asArray(record.connections)) {
       const kind = String(connection.kind || '').toLowerCase();
       const commCategory = kind === 'topic' ? 'topics' : kind === 'service' ? 'services' : kind === 'action' ? 'actions' : '';
-      if (!commCategory) continue;
+      if (!commCategory || connection.name === '<dynamic>') continue;
       const comm = findEntityByName(model, commCategory, connection.name);
       if (!comm) continue;
       let actorId = sourceId;
@@ -282,7 +303,7 @@ function normalize(raw, extras = {}) {
     ];
     for (const [field, category, rel] of groups) {
       for (const endpoint of asArray(entity.data[field])) {
-        const target = findEntityByName(model, category, endpoint.name);
+        const target = endpoint.name === '<dynamic>' ? null : findEntityByName(model, category, endpoint.name);
         if (target) addRelationship(entity.id, target.id, rel, endpoint);
         const iface = findInterfaceByType(model, endpoint.msg_type);
         if (iface) addRelationship(entity.id, iface.id, 'uses_interface', endpoint);
